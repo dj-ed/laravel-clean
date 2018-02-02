@@ -1,0 +1,65 @@
+version: '2'
+
+services:
+  php:
+    build: ./docker/build/php
+    restart: unless-stopped
+    volumes:
+      - ./src/api:/var/www/html
+    environment:
+      - "DB_HOST=mysql"
+    networks:
+      - default
+
+  nginx:
+    build: ./docker/build/nginx
+    restart: unless-stopped
+    volumes:
+      - ./src/api:/var/www/html
+    depends_on:
+      - php
+    ports:
+      - 8080:80
+      - 8000:8000
+    networks:
+      - default
+      - traefik_proxy
+    labels:
+      - 'traefik.backend=laravel_nginx_1'
+      - 'traefik.port=80'
+      - 'traefik.frontend.rule=Host:dev.api.laravel.loc'
+      - "traefik.docker.network=traefik_proxy"
+
+  mysql:
+    image: mysql:5.7.21
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      explicit_defaults_for_timestamp: 1
+      # ports:
+      #   - "8006:3306"
+    volumes:
+      - ./runtime/mysql/data:/var/lib/mysql
+      - ./runtime/mysql/conf:/etc/mysql/conf.d
+      - ./runtime/mysql/databases:/databases
+
+  pma:
+    image: phpmyadmin/phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: root
+      PHP_UPLOAD_MAX_FILESIZE: 1G
+      PHP_MAX_INPUT_VARS: 1G
+    networks:
+      - default
+      - traefik_proxy
+    labels:
+      - 'traefik.backend=laravel_pma_1'
+      - 'traefik.port=80'
+      - 'traefik.frontend.rule=Host:pma.api.laravel.loc'
+      - "traefik.docker.network=traefik_proxy"
+networks:
+  traefik_proxy:
+    external: true
